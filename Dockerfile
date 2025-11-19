@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     libcrypt-dev \
     libmupdf-dev \
     && ldconfig \
-    && ln -sf /usr/lib/aarch64-linux-gnu/libcrypt.so.1 /usr/lib/aarch64-linux-gnu/libcrypt.so.2 \
+    && (find /usr/lib -name "libcrypt.so.1" -exec sh -c 'ln -sf "$1" "$(dirname "$1")/libcrypt.so.2"' _ {} \; || true) \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
