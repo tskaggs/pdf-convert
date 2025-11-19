@@ -42,6 +42,12 @@ env/
 *.temp
 temp/
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/
+
 # OS
 .DS_Store
 Thumbs.db

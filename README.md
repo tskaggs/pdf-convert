@@ -9,6 +9,10 @@ A FastAPI service that converts PDF files to image formats (PNG, JPEG, GIF, WebP
 - Configurable DPI and image quality
 - RESTful API matching CloudConvert's structure
 - Async file processing
+- **API Token Authentication** - Secure access with Bearer tokens
+- **Management Dashboard** - Web-based dashboard for usage statistics and token management
+- **Usage Tracking** - Monitor API usage, conversions, and performance metrics
+- **User Management** - Admin interface for managing users and tokens
 
 ## Installation
 
@@ -35,6 +39,14 @@ docker-compose up --build
 ```
 
 2. The API will be available at `http://localhost:8000`
+
+3. **Initialize the database and create admin user:**
+```bash
+# If running locally
+python seed.py
+
+# If using Docker, the seed script runs automatically on startup
+```
 
 **Docker Commands:**
 ```bash
@@ -66,15 +78,78 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 The API will be available at `http://localhost:8000`
 
+### Authentication
+
+All API endpoints (except `/convert/formats` and `/auth/login`) require authentication using an API token in the `Authorization` header:
+
+```
+Authorization: Bearer YOUR_API_TOKEN
+```
+
+#### Getting Started
+
+1. **Seed the database** (creates default admin user):
+```bash
+python seed.py
+```
+
+Default admin credentials:
+- Username: `admin`
+- Password: `admin123`
+- An API token will be generated and displayed
+
+2. **Login to get an API token:**
+```bash
+curl -X POST "http://localhost:8000/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"username": "admin", "password": "admin123"}'
+```
+
+Response:
+```json
+{
+  "access_token": "your-api-token-here",
+  "token_type": "bearer",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "is_admin": true
+  }
+}
+```
+
+3. **Use the token in API requests:**
+```bash
+curl -X POST "http://localhost:8000/convert" \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
+     -F "file=@document.pdf" \
+     -F "output_format=png"
+```
+
+#### Management Dashboard
+
+Access the web-based dashboard at:
+```
+http://localhost:8000/dashboard
+```
+
+The dashboard requires authentication - you'll need to provide your API token. It shows:
+- Usage statistics (requests, pages converted)
+- Format usage breakdown
+- API token management
+- Example API usage
+
 ### API Endpoints
 
 #### 1. Convert PDF to Image
 
-**POST** `/convert`
+**POST** `/convert` (Requires Authentication)
 
 Convert a PDF file to an image format.
 
 **Request:**
+- `Authorization` header: `Bearer YOUR_API_TOKEN` (required)
 - `file` (file): PDF file to convert
 - `input_format` (string, optional): Input format (default: "pdf")
 - `output_format` (string, required): Output format - one of: "png", "jpeg", "jpg", "gif", "webp"
@@ -85,6 +160,7 @@ Convert a PDF file to an image format.
 **Example using curl:**
 ```bash
 curl -X POST "http://localhost:8000/convert" \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
      -F "file=@document.pdf" \
      -F "output_format=png" \
      -F "pages=1-3" \
@@ -96,6 +172,7 @@ curl -X POST "http://localhost:8000/convert" \
 import requests
 
 url = "http://localhost:8000/convert"
+headers = {"Authorization": "Bearer YOUR_API_TOKEN"}
 files = {"file": open("document.pdf", "rb")}
 data = {
     "output_format": "png",
@@ -103,7 +180,7 @@ data = {
     "dpi": 300
 }
 
-response = requests.post(url, files=files, data=data)
+response = requests.post(url, headers=headers, files=files, data=data)
 result = response.json()
 print(result)
 ```
@@ -150,19 +227,20 @@ print(result)
 
 #### 2. Download Converted Image
 
-**GET** `/download/{task_id}/{page_index}`
+**GET** `/download/{task_id}/{page_index}` (Requires Authentication)
 
 Download a converted image file.
 
 **Example:**
 ```bash
 curl "http://localhost:8000/download/c85f3ca9-164c-4e89-8ae2-c08192a7cb08/0" \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
      --output page-1.png
 ```
 
 #### 3. List Supported Formats
 
-**GET** `/convert/formats`
+**GET** `/convert/formats` (Public endpoint, no authentication required)
 
 List all supported conversion formats.
 
@@ -188,6 +266,58 @@ curl "http://localhost:8000/convert/formats"
   ]
 }
 ```
+
+#### 4. Authentication Endpoints
+
+**POST** `/auth/login` - Login and get API token
+```bash
+curl -X POST "http://localhost:8000/auth/login" \
+     -H "Content-Type: application/json" \
+     -d '{"username": "admin", "password": "admin123"}'
+```
+
+**POST** `/auth/tokens` - Create a new API token (requires authentication)
+```bash
+curl -X POST "http://localhost:8000/auth/tokens" \
+     -H "Authorization: Bearer YOUR_API_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "My API Token"}'
+```
+
+**GET** `/auth/tokens` - List your API tokens (requires authentication)
+```bash
+curl "http://localhost:8000/auth/tokens" \
+     -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+**GET** `/auth/me` - Get current user information (requires authentication)
+```bash
+curl "http://localhost:8000/auth/me" \
+     -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+#### 5. Usage Statistics
+
+**GET** `/usage/stats` - Get your usage statistics (requires authentication)
+```bash
+curl "http://localhost:8000/usage/stats?days=30" \
+     -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+**GET** `/usage/stats/all` - Get all users' statistics (admin only)
+```bash
+curl "http://localhost:8000/usage/stats/all?days=30" \
+     -H "Authorization: Bearer ADMIN_API_TOKEN"
+```
+
+#### 6. Management Dashboard
+
+**GET** `/dashboard` - Web-based management dashboard (requires authentication)
+```
+http://localhost:8000/dashboard
+```
+
+Access the dashboard in your browser. You'll need to provide your API token for authentication.
 
 ## API Documentation
 
